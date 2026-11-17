@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Maze Hunter – The Treasure Quest</title>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:#0f0d1a;color:#f1eefc;font-family:system-ui,Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;user-select:none;-webkit-user-select:none}
+#hud{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:6px;font-size:14px;font-weight:600}
+.chip{background:#251f3f;border:1px solid #3d3466;border-radius:8px;padding:4px 9px;white-space:nowrap}
+#wrap{position:relative}
+canvas{display:block;border:3px solid #3d3466;border-radius:8px;background:#111;height:auto}
+#act{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:none}
+#toast{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:#000b;padding:6px 12px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none;text-align:center}
+#help{font-size:12px;color:#a9a2c9;padding:6px;text-align:center}
+#pad{display:none;width:100%;max-width:520px;justify-content:space-between;align-items:center;padding:6px 14px;touch-action:none}
+@media (pointer:coarse){#pad{display:flex}#help{display:none}}
+.dp{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,56px);gap:6px}
+.dp button{font-size:22px}
+.b,.b2,.dp button,#ab{border:0;border-radius:12px;font-weight:700;color:#fff;cursor:pointer;touch-action:none}
+.b{background:#f59e0b;color:#1b1200;padding:12px 20px;font-size:16px;margin-top:10px}
+.b2{background:#3d3466;padding:10px 16px;font-size:14px;margin-top:8px}
+.dp button{background:#3d3466}
+#ab{width:84px;height:84px;background:#2563eb;font-size:15px}
+#ov{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;padding:12px;z-index:5;overflow:auto}
+.card{background:#1c1733;border:2px solid #5b4aa5;border-radius:16px;padding:18px;max-width:480px;width:100%;text-align:center;display:flex;flex-direction:column;gap:2px}
+.card h1{margin:4px 0 0;font-size:28px;color:#fbbf24}.card h2{margin:0 0 8px;font-size:16px;color:#c4b5fd}.card h3{margin:0}
+.card p{text-align:left;line-height:1.45}
+.card input{padding:10px;border-radius:10px;border:2px solid #5b4aa5;background:#0f0d1a;color:#fff;font-size:16px;text-align:center}
+.op{display:block;width:100%;text-align:left;margin-top:6px;padding:10px;border-radius:10px;border:2px solid #3d3466;background:#251f3f;color:#fff;font-size:15px;cursor:pointer}
+.ok{border-color:#22c55e!important;background:#14532d!important}.no{border-color:#ef4444!important;background:#7f1d1d!important}
+.fb{text-align:left;margin-top:8px;line-height:1.4}
+ul{text-align:left;line-height:1.5;padding-left:20px}
+</style></head><body>
+<div id="hud"></div>
+<div id="wrap"><canvas id="cv" width="672" height="480"></canvas><button class="b" id="act" onclick="inter()">📦 INTERAKSI</button><div id="toast"></div></div>
+<div id="help">WASD / panah: gerak · SPASI: Ability · E / Enter: buka peti</div>
+<div id="pad"><div class="dp"><span></span><button data-d="u">▲</button><span></span><button data-d="l">◀</button><button data-d="d">▼</button><button data-d="r">▶</button></div><button id="ab">❄ ABILITY<br><span id="abn">0</span></button></div>
+<div id="ov"></div>
+<script>
+const W=21,H=15,T=32,DIRS=[[1,0],[-1,0],[0,1],[0,-1]],DV={u:[0,-1],d:[0,1],l:[-1,0],r:[1,0]};
+const $=i=>document.getElementById(i),cv=$("cv"),cx=cv.getContext("2d"),O=$("ov");
+let S=null,snd=true,AC=null,name="Petualang",CUR=null,tt=0;
+const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function beep(f,d=.12,t="square",v=.05,dl=0){if(!snd)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain(),s=AC.currentTime+dl;o.type=t;o.frequency.value=f;g.gain.setValueAtTime(v,s);g.gain.exponentialRampToValueAtTime(.001,s+d);o.connect(g);g.connect(AC.destination);o.start(s);o.stop(s+d)}catch(e){}}
+const QS=[
+[["Perangkat keras yang menampilkan hasil pengolahan data berupa teks dan gambar adalah…",["Keyboard","Monitor","Mouse","Scanner"],1,"Monitor adalah perangkat output; keyboard, mouse, dan scanner adalah perangkat input."],
+["Dina akan membuat surat undangan rapat. Aplikasi perkantoran yang paling tepat adalah…",["Pengolah angka","Pengolah presentasi","Pengolah kata","Pemutar musik"],2,"Pengolah kata (misalnya Word) dipakai untuk membuat dokumen tertulis seperti surat."],
+["Windows, Android, dan Linux adalah contoh…",["Aplikasi permainan","Sistem operasi","Perangkat keras","Mesin pencari"],1,"Sistem operasi mengatur perangkat keras dan menjalankan aplikasi."]],
+[["Agar hasil mesin pencari lebih tepat, sebaiknya kita…",["Mengetik kata kunci yang spesifik","Mengetik satu huruf saja","Mengetik kata acak","Membuka semua hasil"],0,"Kata kunci spesifik mempersempit hasil sehingga lebih relevan."],
+["Alamat situs yang lebih aman untuk mengisi data biasanya diawali…",["http://","ftp://","https://","mail://"],2,"HTTPS mengenkripsi data antara browser dan situs."],
+["Mengirim pesan lewat email atau aplikasi chat termasuk contoh…",["Komunikasi digital","Pencetakan dokumen","Penyimpanan offline","Pemrograman"],0,"Email dan chat memakai internet untuk bertukar informasi."]],
+[["Kata sandi yang paling kuat adalah…",["12345678","namasaya","tanggallahir","Kp#8tR!2mQ"],3,"Kata sandi kuat memadukan huruf besar, kecil, angka, dan simbol."],
+["Kamu menerima pesan hadiah dari nomor tak dikenal yang meminta data pribadi. Sikap yang tepat…",["Mengisi data agar dapat hadiah","Meneruskan ke teman","Mengabaikan dan melaporkan","Memberi kata sandi"],2,"Itu ciri phishing. Jangan beri data pribadi."],
+["Sikap beretika saat bermedia sosial adalah…",["Menyebar kabar sebelum dicek","Mengunggah foto orang tanpa izin","Mengejek teman di komentar","Memeriksa kebenaran berita sebelum membagikan"],3,"Etika digital: sopan, menghormati privasi, dan tidak menyebar hoaks."]],
+[["Algoritma adalah…",["Perangkat keras komputer","Urutan langkah logis untuk menyelesaikan masalah","Jenis virus komputer","Nama bahasa pemrograman"],1,"Algoritma adalah langkah-langkah terurut dan jelas untuk menyelesaikan masalah."],
+["Urutan membuat teh manis: (1) tuang air panas, (2) masukkan teh dan gula ke gelas, (3) aduk, (4) siap diminum.",["1-2-3-4","2-1-3-4","3-2-1-4","4-3-2-1"],1,"Bahan dimasukkan dulu, lalu air dituang, kemudian diaduk."],
+["Variabel dalam pemrograman berfungsi sebagai…",["Wadah penyimpan data yang nilainya dapat berubah","Layar tampilan program","Kabel penghubung","Alat pencetak"],0,"Variabel menyimpan data, misalnya skor = 0, yang bisa berubah saat program berjalan."]],
+[["JIKA nilai ≥ 75 MAKA tampil Lulus, SELAIN ITU tampil Remedial. Jika nilai = 70, hasilnya…",["Lulus","Remedial","Error","Tidak tampil apa-apa"],1,"70 tidak memenuhi ≥ 75, jadi cabang SELAIN ITU (ELSE) dijalankan."],
+["Perintah “maju 10 langkah” diulang 4 kali. Total langkahnya…",["14","10","40","4"],2,"Perulangan: 4 × 10 = 40 langkah."],
+["Scratch dan Blockly memudahkan belajar pemrograman karena memakai…",["Blok visual yang disusun","Kode biner saja","Perintah suara","Kabel jaringan"],0,"Pemrograman berbasis blok: cukup menyusun blok tanpa banyak mengetik kode."]]];
+
+function genMaze(){const g=Array.from({length:H},()=>Array(W).fill(1)),st=[[1,1]];g[1][1]=0;
+while(st.length){const[x,y]=st[st.length-1],n=[[2,0],[-2,0],[0,2],[0,-2]].filter(([a,b])=>{const X=x+a,Y=y+b;return X>0&&Y>0&&X<W-1&&Y<H-1&&g[Y][X]});
+if(!n.length){st.pop();continue}const[a,b]=n[Math.random()*n.length|0];g[y+b/2][x+a/2]=0;g[y+b][x+a]=0;st.push([x+a,y+b])}
+let k=0,tr=0;while(k<28&&tr++<500){const x=1+(Math.random()*(W-2)|0),y=1+(Math.random()*(H-2)|0);
+if(g[y][x]&&((!g[y][x-1]&&!g[y][x+1]&&g[y-1][x]&&g[y+1][x])||(g[y][x-1]&&g[y][x+1]&&!g[y-1][x]&&!g[y+1][x]))){g[y][x]=0;k++}}return g}
+function bfs(g,sx,sy){const D=Array.from({length:H},()=>Array(W).fill(-1));D[sy][sx]=0;const q=[[sx,sy]];
+for(let i=0;i<q.length;i++){const[x,y]=q[i];for(const[a,b]of DIRS){const X=x+a,Y=y+b;if(!g[Y][X]&&D[Y][X]<0){D[Y][X]=D[y][x]+1;q.push([X,Y])}}}return D}
+function place(g){const D=bfs(g,1,1),cells=[];for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(!g[y][x])cells.push([x,y,D[y][x]]);
+const pick=(min,dmin,n)=>{const out=[],av=[[19,13]];for(let L=0;out.length<n&&L<8;L++){const mn=Math.max(2,min-L),md=Math.max(3,dmin-L*2);
+for(let t=0;t<500&&out.length<n;t++){const c=cells[Math.random()*cells.length|0];if(c[2]<md)continue;if([...out,...av].some(o=>Math.abs(o[0]-c[0])+Math.abs(o[1]-c[1])<mn))continue;out.push(c)}}return out};
+return{ch:pick(7,8,5),mo:pick(5,10,5)}}
+
+function go(){const v=$("nm");name=(v&&v.value.trim()||"Petualang").slice(0,16);start()}
+function start(){const g=genMaze(),p=place(g),cols=["#ef4444","#a855f7","#22c55e","#f97316","#ec4899"];
+S={g,lives:3,keys:[],inv:0,flash:0,wave:-1,stun:0,paused:false,run:true,t0:performance.now(),end:0,ab:0,abGot:0,abUsed:0,done:0,ans:0,cor:0,sndT:0,near:null,tq:0,
+P:{x:1.5,y:1.5,face:1,walk:0},chests:p.ch.map((c,i)=>({id:i,x:c[0],y:c[1],done:false})),
+mons:p.mo.map((c,i)=>({x:c[0]+.5,y:c[1]+.5,tx:c[0],ty:c[1],nx:c[0],ny:c[1],px:-1,py:-1,state:"PATROL",st:0,rt:0,col:cols[i%5]}))};
+O.style.display="none";fit()}
+function ov(h){O.innerHTML=h;O.style.display="flex"}
+function menu(){ov(`<div class="card"><div style="font-size:38px">🧙‍♂️🏆👾👻👹</div><h1>MAZE HUNTER</h1><h2>THE TREASURE QUEST</h2><input id="nm" maxlength="16" placeholder="Nama / nickname" value="${esc(name==="Petualang"?"":name)}"><button class="b" onclick="go()">▶ MULAI BERMAIN</button><button class="b2" onclick="help()">📖 PETUNJUK</button><button class="b2" id="sb" onclick="tsnd()">${snd?"🔊 SUARA: HIDUP":"🔇 SUARA: MATI"}</button></div>`)}
+function tsnd(){snd=!snd;const b=$("sb");if(b)b.textContent=snd?"🔊 SUARA: HIDUP":"🔇 SUARA: MATI";beep(600)}
+function help(){ov(`<div class="card"><h3>📖 Petunjuk</h3><ul><li>Gerak: W A S D / tombol panah (di HP: tombol layar).</li><li>Dekati peti 📦 lalu tekan E / Enter / tombol INTERAKSI.</li><li>Jawab 3 soal, minimal 2 benar untuk mendapat 1 Ability ❄.</li><li>SPASI / tombol ABILITY membekukan semua monster 5 detik.</li><li>Monster mengejar jika kamu dekat. Tersentuh = nyawa −1 (3 nyawa).</li><li>Selesaikan 5 peti agar gerbang 🚪 terbuka, lalu capai gerbang.</li></ul><button class="b" onclick="menu()">Kembali</button></div>`)}
+function toast(m){const e=$("toast");e.textContent=m;e.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>e.style.opacity=0,2200)}
+const fmt=s=>String(s/60|0).padStart(2,"0")+":"+String(s%60|0).padStart(2,"0");
+const el=()=>S?((S.run?performance.now():S.end)-S.t0)/1000:0;
+
+function free(x,y){const r=.3;for(const a of[-r,r])for(const b of[-r,r])if(S.g[Math.floor(y+b)][Math.floor(x+a)])return false;return true}
+function movePlayer(dt){const s=S,P=s.P,k=s.keys,d=k.length?k[k.length-1]:null;if(!d)return;const[a,b]=DV[d],sp=4.4*dt;
+if(a){P.y+=Math.max(-sp,Math.min(sp,Math.floor(P.y)+.5-P.y));if(free(P.x+a*sp,P.y))P.x+=a*sp;P.face=a}
+else{P.x+=Math.max(-sp,Math.min(sp,Math.floor(P.x)+.5-P.x));if(free(P.x,P.y+b*sp))P.y+=b*sp}P.walk+=dt*10}
+function pickStep(m){const s=S,D=bfs(s.g,Math.floor(s.P.x),Math.floor(s.P.y)),d=D[m.ty][m.tx],det=m.state==="CHASE"?11:7;
+if(d>0&&d<=det){if(m.state!=="CHASE"&&s.sndT<=0){beep(160,.25,"sawtooth",.05);s.sndT=2}m.state="CHASE";
+for(const[a,b]of DIRS){const X=m.tx+a,Y=m.ty+b;if(!s.g[Y][X]&&D[Y][X]===d-1){m.nx=X;m.ny=Y;m.px=m.tx;m.py=m.ty;return}}}
+if(m.state==="CHASE")m.state="PATROL";
+const o=DIRS.map(([a,b])=>[m.tx+a,m.ty+b]).filter(([X,Y])=>!s.g[Y][X]);let o2=o.filter(([X,Y])=>!(X===m.px&&Y===m.py));if(!o2.length)o2=o;
+const c=o2[Math.random()*o2.length|0];m.nx=c[0];m.ny=c[1];m.px=m.tx;m.py=m.ty}
+function upd(dt){const s=S;if(!s||!s.run)return;
+s.inv=Math.max(0,s.inv-dt);s.flash=Math.max(0,s.flash-dt);s.stun=Math.max(0,s.stun-dt);s.sndT-=dt;if(s.wave>=0){s.wave+=dt;if(s.wave>.7)s.wave=-1}
+if(s.paused)return;
+movePlayer(dt);const P=s.P;
+for(const m of s.mons){
+ if(m.st>0){m.st-=dt;if(m.st<=0){m.state="RETURN";m.rt=.8}continue}
+ if(m.rt>0){m.rt-=dt;if(m.rt<=0&&m.state==="RETURN")m.state="PATROL"}
+ const sp=3*dt,tx=m.nx+.5,ty=m.ny+.5,dx=tx-m.x,dy=ty-m.y,ds=Math.hypot(dx,dy);
+ if(ds<=sp){m.x=tx;m.y=ty;m.tx=m.nx;m.ty=m.ny;pickStep(m)}else{m.x+=dx/ds*sp;m.y+=dy/ds*sp}
+ if(m.st<=0&&s.inv<=0&&Math.hypot(m.x-P.x,m.y-P.y)<.6){s.lives--;s.inv=1.8;s.flash=.4;beep(120,.3,"sawtooth",.08);
+  if(s.lives<=0){s.run=false;s.end=performance.now();beep(200,.3,"triangle",.07);beep(150,.3,"triangle",.07,.25);beep(100,.5,"triangle",.07,.5);
+  ov(`<div class="card"><h1>💀 GAME OVER</h1><p>Nyawa habis, ${esc(name)}. Peti selesai: ${s.done}/5 · Waktu ${fmt(el())}</p><button class="b" onclick="start()">COBA LAGI</button><button class="b2" onclick="menu()">Menu Utama</button></div>`);return}}
+}
+s.near=null;for(const c of s.chests)if(!c.done&&Math.hypot(c.x+.5-P.x,c.y+.5-P.y)<1.3)s.near=c;
+$("act").style.display=s.near?"block":"none";
+if(Math.floor(P.x)===19&&Math.floor(P.y)===13){if(s.done>=5)win();else if(performance.now()-s.tq>2500){s.tq=performance.now();toast("🔒 Gerbang terkunci! Selesaikan semua 5 peti.")}}}
+function win(){const s=S;s.run=false;s.end=performance.now();const t=el(),m=t<300?"🥇 GOLD":t<=600?"🥈 SILVER":"🥉 BRONZE";[523,659,784,1046].forEach((f,i)=>beep(f,.25,"triangle",.07,i*.18));
+ov(`<div class="card"><h1>🏆 KAMU MENANG!</h1><h2>${m}</h2><ul><li>Nama: ${esc(name)}</li><li>Waktu: ${fmt(t)}</li><li>Soal dijawab: ${s.ans} (benar ${s.cor})</li><li>Peti selesai: ${s.done}/5</li><li>Ability diperoleh: ${s.abGot} · digunakan: ${s.abUsed}</li><li>Sisa nyawa: ${s.lives}</li></ul><button class="b" onclick="start()">MAIN LAGI</button><button class="b2" onclick="menu()">Menu Utama</button></div>`)}
+
+function useAb(){const s=S;if(!s||!s.run||s.paused)return;if(s.ab<=0){toast("Belum ada Ability. Buka peti dulu!");return}
+s.ab--;s.abUsed++;s.stun=5;s.wave=0;for(const m of s.mons)m.st=5;beep(880,.4,"sine",.08);beep(440,.5,"sine",.08,.1)}
+function inter(){const s=S;if(!s||!s.run||s.paused||!s.near)return;CUR=s.near;CUR.q=0;CUR.sc=0;CUR.lock=false;s.paused=true;s.keys=[];beep(500,.1);beep(700,.15,"square",.05,.1);qr()}
+function qr(){const c=CUR,q=QS[c.id][c.q];ov(`<div class="card"><h3>📦 Peti ${c.id+1} · Soal ${c.q+1}/3</h3><p>${q[0]}</p>${q[1].map((o,i)=>`<button class="op" id="o${i}" onclick="ans(${i})"><b>${"ABCD"[i]}.</b> ${o}</button>`).join("")}<div class="fb" id="fb"></div></div>`)}
+function ans(i){const c=CUR;if(c.lock)return;c.lock=true;const q=QS[c.id][c.q],ok=i===q[2];S.ans++;
+if(ok){S.cor++;c.sc++;beep(660,.12);beep(880,.15,"square",.05,.1)}else{beep(180,.3,"sawtooth",.06)}
+$("o"+q[2]).classList.add("ok");if(!ok)$("o"+i).classList.add("no");
+$("fb").innerHTML=`<b>${ok?"✅ Benar!":"❌ Salah. Jawaban: "+"ABCD"[q[2]]}</b><br>${q[3]}<br><button class="b" onclick="nq()">Lanjut ▶</button>`}
+function nq(){const c=CUR;c.q++;c.lock=false;if(c.q<3)return qr();const s=S;
+if(c.sc>=2){c.done=true;s.done++;s.ab++;s.abGot++;[523,659,784].forEach((f,i)=>beep(f,.2,"triangle",.07,i*.12));
+ const all=s.done>=5;ov(`<div class="card"><h1>🎉 Peti Terbuka!</h1><p>Benar ${c.sc}/3. Kamu mendapat <b>MONSTER FREEZE – ANCIENT POWER</b> ❄ (Ability: ${s.ab}).${all?"<br><b>🚪 Semua peti selesai! Gerbang akhir terbuka, menujulah ke gerbang!</b>":""}</p><button class="b" onclick="resume()">Lanjut bermain</button></div>`);if(all)toast("🚪 Jalan menuju harta karun akhir terbuka!")}
+else ov(`<div class="card"><h1>🔒 Belum Berhasil</h1><p>Benar ${c.sc}/3. Butuh minimal 2. Kamu bisa mencoba peti ini lagi.</p><button class="b" onclick="resume()">Kembali ke labirin</button></div>`)}
+function resume(){O.style.display="none";S.paused=false;CUR=null}
+
+function draw(t){const s=S,g=s.g,P=s.P;cx.clearRect(0,0,672,480);
+for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(g[y][x]){cx.fillStyle="#3b3550";cx.fillRect(x*T,y*T,T,T);cx.fillStyle="#5a5280";cx.fillRect(x*T,y*T,T,T-6);cx.fillStyle="#463f66";cx.fillRect(x*T+2,y*T+2,T-4,T-10)}else{cx.fillStyle=(x+y)%2?"#1d2a22":"#203227";cx.fillRect(x*T,y*T,T,T)}}
+const open=s.done>=5,gx=19*T,gy=13*T;cx.fillStyle=open?"#16a34a":"#7f1d1d";cx.fillRect(gx+2,gy+2,T-4,T-4);cx.font="22px sans-serif";cx.textAlign="center";cx.textBaseline="middle";cx.fillText(open?"🚪":"🔒",gx+16,gy+17);
+if(open){cx.strokeStyle="rgba(74,222,128,"+(.5+.4*Math.sin(t*5))+")";cx.lineWidth=3;cx.strokeRect(gx,gy,T,T)}
+for(const c of s.chests){const x=c.x*T,y=c.y*T;cx.fillStyle=c.done?"#5b4b30":"#b9791f";cx.fillRect(x+6,y+12,20,14);cx.fillStyle=c.done?"#7a6841":"#d99a2b";cx.fillRect(x+6,y+8,20,6);cx.fillStyle=c.done?"#aaa":"#fde047";cx.fillRect(x+14,y+15,4,5);
+if(!c.done){cx.globalAlpha=.5+.5*Math.sin(t*4);cx.fillStyle="#fde047";cx.fillText("✦",x+16,y+4);cx.globalAlpha=1}}
+for(const m of s.mons){const x=m.x*T,y=m.y*T,ch=m.state==="CHASE",fr=m.st>0,sh=ch?Math.sin(t*30)*1.5:0,by=Math.sin(t*8+m.x)*1.5;
+cx.fillStyle=fr?"#93c5fd":m.col;cx.beginPath();cx.arc(x+sh,y-2+by,11,Math.PI,0);for(let i=0;i<4;i++)cx.lineTo(x+11-i*5.5+sh,y+10+by+(i%2?0:-3));cx.lineTo(x-11+sh,y+10+by);cx.closePath();cx.fill();
+cx.fillStyle="#fff";cx.fillRect(x-7+sh,y-6+by,5,6);cx.fillRect(x+2+sh,y-6+by,5,6);cx.fillStyle=ch?"#dc2626":"#111";cx.fillRect(x-5+sh,y-4+by,3,4);cx.fillRect(x+4+sh,y-4+by,3,4);
+if(ch){cx.fillStyle="#fde047";cx.font="bold 14px sans-serif";cx.fillText("!",x,y-18)}if(fr){cx.fillStyle="#fff";cx.font="bold 12px sans-serif";cx.fillText("❄"+Math.ceil(m.st),x,y-18)}}
+if(s.inv<=0||Math.floor(t*12)%2){const x=P.x*T,y=P.y*T+Math.sin(P.walk)*1.5;cx.fillStyle="#0006";cx.beginPath();cx.ellipse(x,y+11,9,3,0,0,7);cx.fill();
+cx.fillStyle="#38bdf8";cx.beginPath();cx.arc(x,y,10,0,7);cx.fill();cx.fillStyle="#f59e0b";cx.beginPath();cx.arc(x,y-4,10,Math.PI,0);cx.fill();cx.fillRect(x-12,y-5,24,3);
+cx.fillStyle="#fff";cx.fillRect(x-5+P.face*2,y-1,4,5);cx.fillRect(x+1+P.face*2,y-1,4,5);cx.fillStyle="#111";cx.fillRect(x-4+P.face*3,y+1,2,3);cx.fillRect(x+2+P.face*3,y+1,2,3);
+cx.fillStyle="#1e40af";cx.fillRect(x-6,y+8+Math.sin(P.walk*1)*2,4,3);cx.fillRect(x+2,y+8-Math.sin(P.walk)*2,4,3)}
+if(s.stun>0){cx.fillStyle="rgba(147,197,253,.12)";cx.fillRect(0,0,672,480)}
+if(s.wave>=0){cx.strokeStyle="rgba(250,204,21,"+(1-s.wave/.7)+")";cx.lineWidth=8;cx.beginPath();cx.arc(P.x*T,P.y*T,s.wave*900,0,7);cx.stroke()}
+if(s.flash>0){cx.fillStyle="rgba(239,68,68,"+s.flash+")";cx.fillRect(0,0,672,480)}}
+function hud(){const s=S;$("hud").innerHTML=`<span class="chip">👤 ${esc(name)}</span><span class="chip">⏱ ${fmt(el())}</span><span class="chip">${"❤️".repeat(s.lives)||"💔"}</span><span class="chip">📦 ${s.done}/5</span><span class="chip">❄ Ability: ${s.ab}${s.stun>0?" · beku "+s.stun.toFixed(1)+"s":""}</span><span class="chip">${s.done>=5?"🚪 Gerbang terbuka":"🔒 Gerbang terkunci"}</span>`;$("abn").textContent=s.ab}
+function fit(){const pd=matchMedia("(pointer:coarse)").matches?240:130;cv.style.width=Math.max(240,Math.min(innerWidth-16,(innerHeight-pd)*21/15,960))+"px"}
+addEventListener("resize",fit);
+const KM={ArrowUp:"u",w:"u",W:"u",ArrowDown:"d",s:"d",S:"d",ArrowLeft:"l",a:"l",A:"l",ArrowRight:"r",d:"r",D:"r"};
+function press(d){if(!S)return;S.keys=S.keys.filter(k=>k!==d);S.keys.push(d)}
+function rel(d){if(S)S.keys=S.keys.filter(k=>k!==d)}
+addEventListener("keydown",e=>{if(e.target.tagName==="INPUT"){if(e.key==="Enter")go();return}
+if(KM[e.key]){e.preventDefault();if(S&&S.run&&!S.paused)press(KM[e.key])}else if(e.key===" "){e.preventDefault();useAb()}else if(e.key==="e"||e.key==="E"||e.key==="Enter"){inter()}});
+addEventListener("keyup",e=>{if(KM[e.key])rel(KM[e.key])});
+addEventListener("blur",()=>{if(S)S.keys=[]});
+document.querySelectorAll(".dp button").forEach(b=>{const d=b.dataset.d;b.addEventListener("pointerdown",e=>{e.preventDefault();if(S&&S.run&&!S.paused)press(d)});["pointerup","pointerleave","pointercancel"].forEach(ev=>b.addEventListener(ev,()=>rel(d)))});
+$("ab").addEventListener("pointerdown",e=>{e.preventDefault();useAb()});
+let last=0;function loop(t){requestAnimationFrame(loop);const dt=Math.min(.05,(t-last)/1000||0);last=t;if(S){upd(dt);draw(t/1000);hud()}}
+fit();menu();requestAnimationFrame(loop);
+</script></body></html>
